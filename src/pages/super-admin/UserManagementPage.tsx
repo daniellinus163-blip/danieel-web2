@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { User as UserIcon, Search, Shield, Loader2 } from 'lucide-react'
+import { User as UserIcon, Search, Shield, Loader2, Plus, X, Eye } from 'lucide-react'
 import { Database } from '@/lib/supabase'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -17,6 +17,11 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'member' | 'admin' | 'super_admin'>('all')
   const [changingRole, setChangingRole] = useState<string | null>(null)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
+  const [addingMember, setAddingMember] = useState(false)
+  const [newMember, setNewMember] = useState({ email: '', fullName: '', password: '' })
 
   useEffect(() => {
     fetchProfiles()
@@ -58,6 +63,43 @@ export default function UserManagementPage() {
     } finally {
       setChangingRole(null)
     }
+  }
+
+  const handleAddMember = async () => {
+    if (!newMember.email || !newMember.fullName || !newMember.password) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    try {
+      setAddingMember(true)
+
+      const { error } = await supabase.auth.signUp({
+        email: newMember.email,
+        password: newMember.password,
+        options: {
+          data: {
+            full_name: newMember.fullName,
+          },
+        },
+      })
+
+      if (error) throw error
+
+      toast.success('Member added successfully! They will need to confirm their email.')
+      setNewMember({ email: '', fullName: '', password: '' })
+      setShowAddMemberModal(false)
+      await fetchProfiles()
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add member')
+    } finally {
+      setAddingMember(false)
+    }
+  }
+
+  const handleViewProfile = (profile: Profile) => {
+    setSelectedProfile(profile)
+    setShowProfileModal(true)
   }
 
   const filteredProfiles = profiles.filter(profile => {
@@ -126,7 +168,13 @@ export default function UserManagementPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Users</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Users</CardTitle>
+            <Button onClick={() => setShowAddMemberModal(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Member
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-4">
@@ -177,6 +225,14 @@ export default function UserManagementPage() {
                       {profile.role.replace('_', ' ')}
                     </span>
 
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewProfile(profile)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+
                     {profile.id !== user?.id && (
                       <select
                         value={profile.role}
@@ -200,6 +256,110 @@ export default function UserManagementPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Member Modal */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Add New Member</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowAddMemberModal(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name
+                </label>
+                <Input
+                  value={newMember.fullName}
+                  onChange={(e) => setNewMember({ ...newMember, fullName: e.target.value })}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  value={newMember.email}
+                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <Input
+                  type="password"
+                  value={newMember.password}
+                  onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
+                  placeholder="••••••••"
+                />
+              </div>
+              <Button
+                onClick={handleAddMember}
+                disabled={addingMember}
+                className="w-full"
+              >
+                {addingMember ? 'Adding...' : 'Add Member'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* View Profile Modal */}
+      {showProfileModal && selectedProfile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Profile Details</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowProfileModal(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-2xl font-bold">
+                  {selectedProfile.full_name.charAt(0)}
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-lg">{selectedProfile.full_name}</p>
+                  <p className="text-sm text-gray-600">{selectedProfile.email}</p>
+                </div>
+              </div>
+              <div className="space-y-2 pt-4 border-t">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Role:</span>
+                  <span className="text-sm text-gray-900 capitalize">{selectedProfile.role.replace('_', ' ')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Joined:</span>
+                  <span className="text-sm text-gray-900">{new Date(selectedProfile.created_at).toLocaleDateString()}</span>
+                </div>
+                {selectedProfile.bio && (
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">Bio:</span>
+                    <span className="text-sm text-gray-900">{selectedProfile.bio}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Status:</span>
+                  <span className="text-sm text-gray-900">{selectedProfile.is_active ? 'Active' : 'Inactive'}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
