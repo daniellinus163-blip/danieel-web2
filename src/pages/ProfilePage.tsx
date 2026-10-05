@@ -5,12 +5,13 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Edit, Settings, LogOut, ShoppingBag, Heart } from 'lucide-react'
+import { ArrowLeft, Edit, Settings, LogOut, ShoppingBag, Heart, Users, Search, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import ProfileImageUpload from '@/components/profile/ProfileImageUpload'
+import { Database } from '@/lib/supabase'
 
 const profileSchema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -18,12 +19,19 @@ const profileSchema = z.object({
 })
 
 type ProfileFormData = z.infer<typeof profileSchema>
+type Profile = Database['public']['Tables']['profiles']['Row']
 
 export default function ProfilePage() {
   const navigate = useNavigate()
   const { user, profile, refreshProfile, signOut } = useAuth()
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [viewingOtherProfile, setViewingOtherProfile] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
+  const [showUserList, setShowUserList] = useState(false)
+  const [users, setUsers] = useState<Profile[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const {
     register,
@@ -32,20 +40,20 @@ export default function ProfilePage() {
     reset,
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      full_name: profile?.full_name || '',
-      bio: profile?.bio || '',
-    },
   })
 
+  const currentProfile = selectedProfile || profile
+  const isSuperAdmin = profile?.role === 'super_admin'
+  const canEdit = !viewingOtherProfile || selectedProfile?.id === user?.id
+
   useEffect(() => {
-    if (profile) {
+    if (currentProfile) {
       reset({
-        full_name: profile.full_name,
-        bio: profile.bio || '',
+        full_name: currentProfile.full_name,
+        bio: currentProfile.bio || '',
       })
     }
-  }, [profile, reset])
+  }, [selectedProfile, profile, reset])
 
   const handleLogout = async () => {
     await signOut()
@@ -62,7 +70,7 @@ export default function ProfilePage() {
           bio: data.bio || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', profile?.id)
+        .eq('id', selectedProfile?.id || profile?.id)
 
       if (error) throw error
 
@@ -74,6 +82,40 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setUsers(data || [])
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch users')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  const handleViewUser = async (userProfile: Profile) => {
+    setSelectedProfile(userProfile)
+    setViewingOtherProfile(true)
+    setShowUserList(false)
+    setSearchTerm('')
+  }
+
+  const handleBackToOwnProfile = () => {
+    setSelectedProfile(null)
+    setViewingOtherProfile(false)
+  }
+
+  const handleShowUserList = () => {
+    setShowUserList(true)
+    fetchUsers()
   }
 
   if (!profile) {
@@ -118,32 +160,43 @@ export default function ProfilePage() {
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative h-32 w-32 rounded-full bg-gray-200 overflow-hidden mb-4">
-                    {profile.avatar_url ? (
+                    {currentProfile?.avatar_url ? (
                       <img
-                        src={profile.avatar_url}
-                        alt={profile.full_name}
+                        src={currentProfile.avatar_url}
+                        alt={currentProfile.full_name}
                         className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-purple-100 text-purple-600 text-4xl font-bold">
-                        {profile.full_name.charAt(0)}
+                        {currentProfile?.full_name.charAt(0)}
                       </div>
                     )}
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">{profile.full_name}</h2>
-                  <p className="text-gray-600 text-sm mb-2">{profile.email}</p>
+                  <h2 className="text-xl font-bold text-gray-900">{currentProfile?.full_name}</h2>
+                  <p className="text-gray-600 text-sm mb-2">{currentProfile?.email}</p>
                   <span className="inline-block px-3 py-1 rounded-full text-xs font-medium capitalize bg-purple-100 text-purple-700">
-                    {profile.role.replace('_', ' ')}
+                    {currentProfile?.role.replace('_', ' ')}
                   </span>
                   <p className="text-xs text-gray-500 mt-4">
-                    Joined {new Date(profile.created_at).toLocaleDateString()}
+                    Joined {new Date(currentProfile?.created_at || '').toLocaleDateString()}
                   </p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="mt-4">
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 space-y-2">
+                {isSuperAdmin && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    size="sm"
+                    onClick={handleShowUserList}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    View All Users
+                  </Button>
+                )}
                 <Link to="/settings/profile">
                   <Button variant="outline" className="w-full" size="sm">
                     <Settings className="h-4 w-4 mr-2" />
@@ -156,11 +209,25 @@ export default function ProfilePage() {
 
           {/* Profile Details */}
           <div className="md:col-span-2 space-y-6">
+            {viewingOtherProfile && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackToOwnProfile}
+                className="mb-4"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to My Profile
+              </Button>
+            )}
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Profile Information</CardTitle>
-                  {!isEditing && (
+                  <CardTitle>
+                    {viewingOtherProfile ? `${currentProfile?.full_name}'s Profile` : 'Profile Information'}
+                  </CardTitle>
+                  {!isEditing && canEdit && (
                     <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
@@ -208,20 +275,20 @@ export default function ProfilePage() {
                   <div className="space-y-4">
                     <div>
                       <p className="text-sm text-gray-600">Full Name</p>
-                      <p className="font-medium text-gray-900">{profile.full_name}</p>
+                      <p className="font-medium text-gray-900">{currentProfile?.full_name}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Email</p>
-                      <p className="font-medium text-gray-900">{profile.email}</p>
+                      <p className="font-medium text-gray-900">{currentProfile?.email}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Role</p>
-                      <p className="font-medium text-gray-900 capitalize">{profile.role.replace('_', ' ')}</p>
+                      <p className="font-medium text-gray-900 capitalize">{currentProfile?.role.replace('_', ' ')}</p>
                     </div>
-                    {profile.bio && (
+                    {currentProfile?.bio && (
                       <div>
                         <p className="text-sm text-gray-600">Bio</p>
-                        <p className="font-medium text-gray-900">{profile.bio}</p>
+                        <p className="font-medium text-gray-900">{currentProfile.bio}</p>
                       </div>
                     )}
                   </div>
@@ -229,17 +296,81 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Image</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ProfileImageUpload />
-              </CardContent>
-            </Card>
+            {!viewingOtherProfile && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profile Image</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ProfileImageUpload />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
+
+      {/* User List Modal */}
+      {showUserList && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>All Users</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowUserList(false)}>
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by name or email"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              <div className="overflow-y-auto max-h-[60vh] space-y-2">
+                {loadingUsers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                  </div>
+                ) : (
+                  users
+                    .filter(
+                      (u) =>
+                        u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map((userProfile) => (
+                      <div
+                        key={userProfile.id}
+                        onClick={() => handleViewUser(userProfile)}
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
+                            {userProfile.full_name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{userProfile.full_name}</p>
+                            <p className="text-sm text-gray-600">{userProfile.email}</p>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 rounded-full text-xs font-medium capitalize bg-purple-100 text-purple-700">
+                          {userProfile.role.replace('_', ' ')}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
