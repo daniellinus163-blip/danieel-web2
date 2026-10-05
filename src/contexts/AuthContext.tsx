@@ -24,11 +24,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchProfile(session.user.id)
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        if (error || !profile) {
+          // Profile doesn't exist, create it (for OAuth users)
+          await createProfile(
+            session.user.id,
+            session.user.email!,
+            session.user.user_metadata.full_name
+          )
+        } else {
+          await fetchProfile(session.user.id)
+        }
       }
       setLoading(false)
     })
@@ -36,11 +51,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
+    } = supabase.auth.onAuthStateChange(async (_event: string, session: Session | null) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchProfile(session.user.id)
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        if (error || !profile) {
+          // Profile doesn't exist, create it (for OAuth users)
+          await createProfile(
+            session.user.id,
+            session.user.email!,
+            session.user.user_metadata.full_name
+          )
+        } else {
+          await fetchProfile(session.user.id)
+        }
       } else {
         setProfile(null)
       }
@@ -85,6 +115,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setProfile(data)
       }
+    }
+  }
+
+  const createProfile = async (userId: string, email: string, fullName?: string) => {
+    let role = 'member'
+    const emailLower = email.toLowerCase()
+
+    // Super admin email
+    if (emailLower === 'daniellinus163@gmail.com') {
+      role = 'super_admin'
+    }
+    // Admin email
+    else if (emailLower === 'vicdam539@gmail.com') {
+      role = 'admin'
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        email: email,
+        full_name: fullName || email.split('@')[0],
+        role: role,
+        is_active: true,
+      })
+
+    if (error) {
+      console.error('Error creating profile:', error)
+    } else {
+      await fetchProfile(userId)
     }
   }
 
