@@ -21,7 +21,7 @@ type ProfileFormData = z.infer<typeof profileSchema>
 
 export default function ProfilePage() {
   const navigate = useNavigate()
-  const { user, profile, refreshProfile, logout } = useAuth()
+  const { user, profile, refreshProfile, signOut } = useAuth()
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -48,7 +48,7 @@ export default function ProfilePage() {
   }, [profile, reset])
 
   const handleLogout = async () => {
-    await logout()
+    await signOut()
     navigate('/')
   }
 
