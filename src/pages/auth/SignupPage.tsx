@@ -14,7 +14,6 @@ const signupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['member', 'admin', 'super_admin']),
 })
 
 type SignupFormData = z.infer<typeof signupSchema>
@@ -29,9 +28,6 @@ export default function SignupPage() {
     formState: { errors },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: {
-      role: 'member',
-    },
   })
 
   const onSubmit = async (data: SignupFormData) => {
@@ -43,20 +39,14 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: data.fullName,
-            requested_role: data.role,
           },
         },
       })
 
       if (error) throw error
 
-      if (data.role === 'member') {
-        toast.success('Account created successfully! Please check your email to confirm your account.')
-        navigate('/login')
-      } else {
-        toast.success('Account created! Your admin/super admin request has been submitted for approval.')
-        navigate('/login')
-      }
+      toast.success('Account created successfully! Please check your email to confirm your account.')
+      navigate('/login')
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account')
     } finally {
@@ -136,28 +126,6 @@ export default function SignupPage() {
                 />
                 {errors.password && (
                   <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
-                </label>
-                <select
-                  id="role"
-                  {...register('role')}
-                  disabled={loading}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin (Requires Approval)</option>
-                  <option value="super_admin">Super Admin (Requires Approval)</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Admin and Super Admin roles require approval from an existing Super Admin.
-                </p>
-                {errors.role && (
-                  <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
                 )}
               </div>
 

@@ -12,6 +12,7 @@ import SetupPage from '@/pages/SetupPage'
 import TestPage from '@/pages/TestPage'
 import MemberDashboard from '@/pages/member/MemberDashboard'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
+import MemberManagementPage from '@/pages/admin/MemberManagementPage'
 import SuperAdminDashboard from '@/pages/super-admin/SuperAdminDashboard'
 import RoleRequestsPage from '@/pages/super-admin/RoleRequestsPage'
 import ImagePolicySettings from '@/pages/super-admin/ImagePolicySettings'
@@ -84,6 +85,7 @@ function App() {
             }
           >
             <Route index element={<AdminDashboard />} />
+            <Route path="members" element={<MemberManagementPage />} />
           </Route>
 
           <Route

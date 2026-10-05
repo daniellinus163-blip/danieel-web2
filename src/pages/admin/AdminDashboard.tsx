@@ -1,6 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
 import { User, Users, Shield } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import ProfileImageUpload from '@/components/profile/ProfileImageUpload'
 
 export default function AdminDashboard() {
@@ -28,19 +29,21 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-purple-600" />
-              <CardTitle>Member Directory</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
-              View and search member profiles
-            </p>
-          </CardContent>
-        </Card>
+        <Link to="members">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-purple-600" />
+                <CardTitle>Member Management</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600">
+                View and manage all members
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardHeader>

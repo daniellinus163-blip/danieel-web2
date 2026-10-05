@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
-import { User, Users, ArrowLeft } from 'lucide-react'
+import { User, ArrowLeft } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import ProfileImageUpload from '@/components/profile/ProfileImageUpload'
 
@@ -30,7 +30,7 @@ export default function MemberDashboard() {
           <p className="mt-2 text-gray-600">Welcome back, {profile?.full_name}!</p>
         </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1">
         <Card>
           <CardHeader>
             <div className="flex items-center space-x-2">
@@ -41,20 +41,6 @@ export default function MemberDashboard() {
           <CardContent>
             <p className="text-sm text-gray-600">
               View and edit your personal profile information
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-purple-600" />
-              <CardTitle>Member Directory</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
-              Browse and search other member profiles
             </p>
           </CardContent>
         </Card>

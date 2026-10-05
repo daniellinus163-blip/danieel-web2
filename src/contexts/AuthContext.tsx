@@ -60,7 +60,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       console.error('Error fetching profile:', error)
     } else {
-      setProfile(data)
+      // Auto-assign role based on email if profile exists
+      if (data) {
+        let role = data.role
+        const email = data.email.toLowerCase()
+
+        // Super admin email
+        if (email === 'daniellinus163@gmail.com') {
+          role = 'super_admin'
+        }
+        // Admin email
+        else if (email === 'vicdam539@gmail.com') {
+          role = 'admin'
+        }
+
+        // Update role if it doesn't match email-based assignment
+        if (role !== data.role) {
+          await supabase
+            .from('profiles')
+            .update({ role })
+            .eq('id', userId)
+          data.role = role
+        }
+
+        setProfile(data)
+      }
     }
   }
 
